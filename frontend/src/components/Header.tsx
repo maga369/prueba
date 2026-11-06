@@ -1,8 +1,9 @@
 import { useLocation } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
 
 interface HeaderProps {
-  user: any;
+  user: {
+    preferred_username?: string;
+  } | null;
 }
 
 export function Header({ user }: HeaderProps) {

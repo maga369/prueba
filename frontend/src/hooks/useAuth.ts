@@ -1,24 +1,38 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import Keycloak from 'keycloak-js'
-import { UserInfo } from '../types/api'
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import Keycloak from "keycloak-js";
+import { UserInfo, UserRole } from "../types/api";
 
 interface AuthState {
-  user: UserInfo | null
-  keycloak: Keycloak | null
-  isLoading: boolean
-  isAuthenticated: boolean
-  hasRole: (role: string) => boolean
-  login: () => Promise<void>
-  logout: () => Promise<void>
-  initKeycloak: () => Promise<void>
-  updateToken: () => Promise<boolean>
+  user: UserInfo | null;
+  keycloak: Keycloak | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  hasRole: (role: UserRole) => boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
+  initKeycloak: () => Promise<void>;
+  updateToken: () => Promise<boolean>;
 }
 
 const keycloakConfig = {
-  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'legal-redactor',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'frontend',
+  url: import.meta.env.VITE_KEYCLOAK_URL || "http://localhost:8080",
+  realm: import.meta.env.VITE_KEYCLOAK_REALM || "legal-redactor",
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || "frontend",
+};
+
+function mapKeycloakUser(kc: Keycloak): UserInfo {
+  const tp = kc.tokenParsed || {};
+  const roles: UserRole[] = (tp.realm_access?.roles as UserRole[]) || [];
+  return {
+    id: kc.subject || tp.sub || "",
+    email: tp.email || "",
+    full_name: tp.name,
+    preferred_username: tp.preferred_username || "",
+    role: roles[0] || "transcriptor",
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
 }
 
 export const useAuth = create<AuthState>()(
@@ -29,84 +43,69 @@ export const useAuth = create<AuthState>()(
       isLoading: true,
       isAuthenticated: false,
 
-      hasRole: (role: string) => {
-        const { user } = get()
-        if (!user) return false
-        const roles = user.realm_access?.roles || []
-        return roles.includes(role)
+      hasRole: (role: UserRole) => {
+        const { user } = get();
+        if (!user) return false;
+        return user.role === role;
       },
 
       initKeycloak: async () => {
-        const kc = new Keycloak(keycloakConfig)
+        const kc = new Keycloak(keycloakConfig);
 
         try {
           const authenticated = await kc.init({
-            onLoad: 'check-sso',
-            silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
-            pkceMethod: 'S256',
-          })
+            onLoad: "check-sso",
+            silentCheckSsoRedirectUri: window.location.origin + "/silent-check-sso.html",
+            pkceMethod: "S256",
+          });
 
           if (authenticated && kc.tokenParsed) {
-            const userInfo: UserInfo = {
-              sub: kc.subject || '',
-              email: kc.tokenParsed.email || '',
-              name: kc.tokenParsed.name,
-              preferred_username: kc.tokenParsed.preferred_username || '',
-              given_name: kc.tokenParsed.given_name,
-              family_name: kc.tokenParsed.family_name,
-              realm_access: kc.tokenParsed.realm_access || { roles: [] },
-              resource_access: kc.tokenParsed.resource_access || {},
-            }
-            set({ user: userInfo, keycloak: kc, isAuthenticated: true, isLoading: false })
+            const userInfo = mapKeycloakUser(kc);
+            set({ user: userInfo, keycloak: kc, isAuthenticated: true, isLoading: false });
 
             // Auto-refresh token
             setInterval(() => {
-              kc.updateToken(30).then(refreshed => {
+              kc.updateToken(30).then((refreshed) => {
                 if (refreshed && kc.tokenParsed) {
-                  set({
-                    user: {
-                      ...userInfo,
-                      realm_access: kc.tokenParsed.realm_access || { roles: [] },
-                    },
-                  })
+                  set({ user: mapKeycloakUser(kc) });
                 }
-              })
-            }, 30000)
+              });
+            }, 30000);
           } else {
-            set({ isLoading: false })
+            set({ isLoading: false });
           }
         } catch (error) {
-          console.error('Keycloak init failed:', error)
-          set({ isLoading: false })
+          console.error("Keycloak init failed:", error);
+          set({ isLoading: false });
         }
       },
 
       login: async () => {
-        const { keycloak } = get()
+        const { keycloak } = get();
         if (keycloak) {
-          await keycloak.login({ redirectUri: window.location.origin })
+          await keycloak.login({ redirectUri: window.location.origin });
         }
       },
 
       logout: async () => {
-        const { keycloak } = get()
+        const { keycloak } = get();
         if (keycloak) {
-          await keycloak.logout({ redirectUri: window.location.origin })
+          await keycloak.logout({ redirectUri: window.location.origin });
         }
-        set({ user: null, isAuthenticated: false })
+        set({ user: null, isAuthenticated: false });
       },
 
       updateToken: async () => {
-        const { keycloak } = get()
+        const { keycloak } = get();
         if (keycloak) {
-          return await keycloak.updateToken(30)
+          return await keycloak.updateToken(30);
         }
-        return false
+        return false;
       },
     }),
     {
-      name: 'auth-storage',
+      name: "auth-storage",
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
   )
-)
+);

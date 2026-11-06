@@ -1,70 +1,75 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
-import { useAuth } from '../hooks/useAuth'
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { useAuth } from "../hooks/useAuth";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 class ApiClient {
-  private client: AxiosInstance
-  private getToken: () => string | null
+  private client: AxiosInstance;
+  private getToken: () => string | null;
 
   constructor(getToken: () => string | null) {
-    this.getToken = getToken
+    this.getToken = getToken;
     this.client = axios.create({
       baseURL: `${API_URL}/api/v1`,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       timeout: 30000,
-    })
+    });
 
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const token = this.getToken()
+        const token = this.getToken();
         if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`
+          config.headers.Authorization = `Bearer ${token}`;
         }
-        return config
+        return config;
       },
       (error) => Promise.reject(error)
-    )
+    );
 
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
         if (error.response?.status === 401) {
           // Token expired, try to refresh
-          const refreshed = await useAuth.getState().updateToken()
+          const refreshed = await useAuth.getState().updateToken();
           if (refreshed) {
-            const newToken = useAuth.getState().keycloak?.token
+            const newToken = useAuth.getState().keycloak?.token;
             if (newToken && error.config) {
-              error.config.headers.Authorization = `Bearer ${newToken}`
-              return this.client.request(error.config)
+              error.config.headers.Authorization = `Bearer ${newToken}`;
+              return this.client.request(error.config);
             }
           }
           // If refresh failed, logout
-          useAuth.getState().logout()
+          useAuth.getState().logout();
         }
-        return Promise.reject(error)
+        return Promise.reject(error);
       }
-    )
+    );
   }
 
-  get = this.client.get.bind(this.client)
-  post = this.client.post.bind(this.client)
-  put = this.client.put.bind(this.client)
-  patch = this.client.patch.bind(this.client)
-  delete = this.client.delete.bind(this.client)
+  get = this.client.get.bind(this.client);
+  post = this.client.post.bind(this.client);
+  put = this.client.put.bind(this.client);
+  patch = this.client.patch.bind(this.client);
+  delete = this.client.delete.bind(this.client);
 }
 
-// Create a singleton instance
-let apiInstance: ApiClient | null = null
+// Lazy singleton - only created when first accessed
+let apiInstance: ApiClient | null = null;
 
-export const getApiClient = (): ApiClient => {
+const getApiClient = (): ApiClient => {
   if (!apiInstance) {
-    apiInstance = new ApiClient(() => useAuth.getState().keycloak?.token || null)
+    apiInstance = new ApiClient(() => useAuth.getState().keycloak?.token || null);
   }
-  return apiInstance
-}
+  return apiInstance;
+};
 
-// Export for convenience
-export const api = getApiClient()
+// Export a proxy that lazily initializes the client
+export const api = new Proxy({} as ApiClient, {
+  get(target, prop, receiver) {
+    const client = getApiClient();
+    return Reflect.get(client, prop, receiver);
+  },
+});

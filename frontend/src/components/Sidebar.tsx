@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { clsx } from "clsx";
 
@@ -15,9 +15,12 @@ const navItems: NavItem[] = [
   { path: "/admin/users", label: "Usuarios", icon: <UsersIcon />, roles: ["admin"] },
 ];
 
+interface NavLinkProps {
+  isActive: boolean;
+}
+
 export function Sidebar() {
   const { user, hasRole, logout } = useAuth();
-  const location = useLocation();
 
   const filteredItems = navItems.filter((item) => !item.roles || item.roles.some((r) => hasRole(r)));
 
@@ -32,7 +35,7 @@ export function Sidebar() {
           <NavLink
             key={item.path}
             to={item.path}
-            className={({ isActive }) =>
+            className={({ isActive }: NavLinkProps) =>
               clsx(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
@@ -51,14 +54,14 @@ export function Sidebar() {
       <div className="p-4 border-t border-slate-200">
         <div className="px-3 py-2 mb-2">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Usuario</p>
-          <p className="text-sm font-medium text-slate-900 truncate">{user?.name || user?.email}</p>
+          <p className="text-sm font-medium text-slate-900 truncate">{user?.full_name || user?.email}</p>
           <p className="text-xs text-slate-500 truncate">{user?.email}</p>
         </div>
         <button
           onClick={logout}
           className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
         >
-          <LogoutIcon className="h-5 w-5" />
+          <LogoutIcon />
           Cerrar sesión
         </button>
       </div>
