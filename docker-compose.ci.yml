@@ -1,0 +1,94 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: legal_redactor_test
+      POSTGRES_USER: legal
+      POSTGRES_PASSWORD: legal_pass
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports: ["9000:9000", "9001:9001"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    ports: ["3000:3000"]
+    environment:
+      - LOG_LEVEL=ERROR
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:latest
+    ports: ["3001:3000"]
+    environment:
+      - LOG_LEVEL=ERROR
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    command: >
+      sh -c "alembic upgrade head && pytest tests/ -v --tb=short"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://legal:legal_pass@postgres:5432/legal_redactor_test
+      - REDIS_URL=redis://redis:6379/0
+      - PRESIDIO_ANALYZER_URL=http://presidio-analyzer:3000
+      - PRESIDIO_ANONYMIZER_URL=http://presidio-anonymizer:3000
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=legal-redactor
+      - SECRET_KEY=test-secret-key-for-ci-testing-only-32-chars
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - CORS_ORIGINS=["http://localhost:5173"]
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      presidio-analyzer:
+        condition: service_healthy
+      presidio-anonymizer:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
