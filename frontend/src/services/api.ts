@@ -32,7 +32,6 @@ class ApiClient {
       (response) => response,
       async (error) => {
         if (error.response?.status === 401) {
-          // Token expired, try to refresh
           const refreshed = await useAuth.getState().updateToken();
           if (refreshed) {
             const newToken = useAuth.getState().keycloak?.token;
@@ -41,7 +40,6 @@ class ApiClient {
               return this.client.request(error.config);
             }
           }
-          // If refresh failed, logout
           useAuth.getState().logout();
         }
         return Promise.reject(error);
@@ -56,7 +54,6 @@ class ApiClient {
   delete = this.client.delete.bind(this.client);
 }
 
-// Lazy singleton - only created when first accessed
 let apiInstance: ApiClient | null = null;
 
 const getApiClient = (): ApiClient => {
@@ -66,7 +63,6 @@ const getApiClient = (): ApiClient => {
   return apiInstance;
 };
 
-// Export a proxy that lazily initializes the client
 export const api = new Proxy({} as ApiClient, {
   get(target, prop, receiver) {
     const client = getApiClient();

@@ -1,360 +1,115 @@
-import { useState } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import { Card, Button, Input, Badge } from '../components/ui'
-import { User, Key, Bell, Shield, Palette, Globe, Save } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useState } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { Button, Card, Input } from "../components/ui";
+import { User, Key, Bell, Save } from "lucide-react";
+import toast from "react-hot-toast";
 
 export function Settings() {
-  const { user, keycloak, updateToken, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'appearance'>('profile')
-  const [saving, setSaving] = useState(false)
-
-  const tabs = [
-    { id: 'profile', label: 'Perfil', icon: <User className="h-5 w-5" /> },
-    { id: 'security', label: 'Seguridad', icon: <Shield className="h-5 w-5" /> },
-    { id: 'notifications', label: 'Notificaciones', icon: <Bell className="h-5 w-5" /> },
-    { id: 'appearance', label: 'Apariencia', icon: <Palette className="h-5 w-5" /> },
-  ]
-
-  const handleSave = async () => {
-    setSaving(true)
-    // Simulate save
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    if (keycloak) {
-      await updateToken()
-    }
-    toast.success('Configuraci贸n guardada')
-    setSaving(false)
-  }
-
-  const handleLogout = async () => {
-    await logout()
-  }
-
-  return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Configuraci贸n</h1>
-        <p className="text-slate-500">Gestiona tu perfil y preferencias</p>
-      </div>
-
-      {/* Tab navigation */}
-      <Card variant="outlined">
-        <div className="border-b border-slate-200">
-          <nav className="flex -mb-px" aria-label="Tabs">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={clsx(
-                  'flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-colors',
-                  activeTab === tab.id
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                )}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <div className="p-6">
-          {activeTab === 'profile' && (
-            <ProfileTab user={user} onSave={handleSave} saving={saving} />
-          )}
-          {activeTab === 'security' && (
-            <SecurityTab keycloak={keycloak} onLogout={handleLogout} />
-          )}
-          {activeTab === 'notifications' && (
-            <NotificationsTab />
-          )}
-          {activeTab === 'appearance' && (
-            <AppearanceTab />
-          )}
-        </div>
-      </Card>
-    </div>
-  )
-}
-
-function ProfileTab({ user, onSave, saving }: { user: any; onSave: () => void; saving: boolean }) {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<"profile" | "security" | "notifications">("profile");
   const [formData, setFormData] = useState({
-    full_name: user?.name || '',
-    email: user?.email || '',
-    preferred_username: user?.preferred_username || '',
-  })
+    full_name: user?.full_name || "",
+    email: user?.email || "",
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+    email_notifications: true,
+    document_updates: true,
+    approval_requests: true,
+    system_alerts: false,
+  });
+  const [saving, setSaving] = useState(false);
 
-  return (
-    <form onSubmit={(e) => { e.preventDefault(); onSave() }} className="space-y-6">
-      <div className="flex items-center gap-4">
-        <div className="h-20 w-20 rounded-full bg-primary-100 flex items-center justify-center">
-          <span className="text-2xl font-bold text-primary-700">
-            {formData.full_name?.charAt(0).toUpperCase() || formData.email?.charAt(0).toUpperCase() || 'U'}
-          </span>
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">{formData.full_name || 'Sin nombre'}</h3>
-          <p className="text-slate-500">{formData.email}</p>
-          <Badge variant="outline" className="mt-1">{formData.preferred_username}</Badge>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          label="Nombre completo"
-          value={formData.full_name}
-          onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-        />
-        <Input
-          label="Email"
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          disabled
-          helperText="El email se gestiona desde Keycloak"
-        />
-      </div>
-
-      <Input
-        label="Nombre de usuario"
-        value={formData.preferred_username}
-        onChange={(e) => setFormData({ ...formData, preferred_username: e.target.value })}
-        helperText="Nombre de usuario en Keycloak"
-      />
-
-      <div className="flex justify-end">
-        <Button type="submit" loading={saving}>
-          <Save className="h-4 w-4 mr-1" />
-          Guardar cambios
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-function SecurityTab({ keycloak, onLogout }: { keycloak: any; onLogout: () => void }) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900 mb-2">Sesi贸n actual</h3>
-        <p className="text-slate-500 text-sm">Gestiona tu sesi贸n y seguridad</p>
-      </div>
-
-      <Card variant="outlined" padding="md">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="font-medium text-slate-900">Renovar token</h4>
-            <p className="text-sm text-slate-500">Actualiza tu token de acceso manualmente</p>
-          </div>
-          <Button variant="outline" onClick={() => keycloak?.updateToken(0)}>
-            Renovar ahora
-          </Button>
-        </div>
-      </Card>
-
-      <Card variant="outlined" padding="md">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="font-medium text-slate-900">Cerrar sesi贸n en todos los dispositivos</h4>
-            <p className="text-sm text-slate-500">Invalida todas las sesiones activas</p>
-          </div>
-          <Button variant="danger" onClick={onLogout}>
-            Cerrar sesi贸n globalmente
-          </Button>
-        </div>
-      </Card>
-
-      <Card variant="outlined" padding="md">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="font-medium text-slate-900">Autenticaci贸n de dos factores (2FA)</h4>
-            <p className="text-sm text-slate-500">Configura 2FA desde Keycloak</p>
-          </div>
-          <Button variant="outline" onClick={() => window.open(`${import.meta.env.VITE_KEYCLOAK_URL}/realms/${import.meta.env.VITE_KEYCLOAK_REALM}/account/security/signingin`, '_blank')}>
-            Configurar en Keycloak
-          </Button>
-        </div>
-      </Card>
-    </div>
-  )
-}
-
-function NotificationsTab() {
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [pushNotifications, setPushNotifications] = useState(false)
-  const [documentUpdates, setDocumentUpdates] = useState(true)
-  const [approvalRequests, setApprovalRequests] = useState(true)
-  const [systemAlerts, setSystemAlerts] = useState(true)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    await new Promise(r => setTimeout(r, 500));
+    toast.success("Configuraci髇 guardada");
+    setSaving(false);
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900 mb-2">Preferencias de notificaci贸n</h3>
-        <p className="text-slate-500 text-sm">Configura c贸mo quieres recibir avisos</p>
+      <h1 className="text-2xl font-bold text-slate-900">Configuraci髇</h1>
+
+      <div className="flex gap-4 border-b border-slate-200">
+        {["profile", "security", "notifications"].map((tab) => (
+          <Button
+            key={tab}
+            variant={activeTab === tab ? "default" : "ghost"}
+            onClick={() => setActiveTab(tab)}
+            className="border-b-2 border-transparent hover:border-primary-300"
+          >
+            {tab === "profile" && <User className="h-4 w-4 mr-2" />}
+            {tab === "security" && <Key className="h-4 w-4 mr-2" />}
+            {tab === "notifications" && <Bell className="h-4 w-4 mr-2" />}
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </Button>
+        ))}
       </div>
 
-      <Card variant="outlined" padding="md">
-        <h4 className="font-medium text-slate-900 mb-4">Canales de notificaci贸n</h4>
-        <div className="space-y-4">
-          <label className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-slate-900">Email</p>
-              <p className="text-sm text-slate-500">Recibir notificaciones por correo electr贸nico</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={emailNotifications}
-              onChange={(e) => setEmailNotifications(e.target.checked)}
-              className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-            />
-          </label>
-          <label className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-slate-900">Push (navegador)</p>
-              <p className="text-sm text-slate-500">Notificaciones push en el navegador</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={pushNotifications}
-              onChange={(e) => setPushNotifications(e.target.checked)}
-              className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-            />
-          </label>
-        </div>
-      </Card>
-
-      <Card variant="outlined" padding="md">
-        <h4 className="font-medium text-slate-900 mb-4">Tipos de notificaci贸n</h4>
-        <div className="space-y-4">
-          {[
-            { key: 'documentUpdates', label: 'Actualizaciones de documentos', desc: 'Cuando un documento cambia de estado' },
-            { key: 'approvalRequests', label: 'Solicitudes de aprobaci贸n', desc: 'Cuando un documento requiere tu aprobaci贸n' },
-            { key: 'systemAlerts', label: 'Alertas del sistema', desc: 'Mantenimientos, actualizaciones, incidencias' },
-          ].map(({ key, label, desc }) => (
-            <label key={key} className="flex items-center justify-between">
+      <Card>
+        <form onSubmit={handleSubmit} className="space-y-6 p-6">
+          {activeTab === "profile" && (
+            <div className="grid gap-4 md:grid-cols-2 max-w-2xl">
               <div>
-                <p className="font-medium text-slate-900">{label}</p>
-                <p className="text-sm text-slate-500">{desc}</p>
+                <label className="block text-sm font-medium mb-1">Nombre completo</label>
+                <Input value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
               </div>
-              <input
-                type="checkbox"
-                checked={eval(key)}
-                onChange={(e) => eval(`set${key.charAt(0).toUpperCase() + key.slice(1)}`)(e.target.checked)}
-                className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-              />
-            </label>
-          ))}
-        </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} disabled />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Rol</label>
+                <Input value={user?.role || ""} disabled />
+              </div>
+            </div>
+          )}
+
+          {activeTab === "security" && (
+            <div className="grid gap-4 md:grid-cols-2 max-w-2xl">
+              <div>
+                <label className="block text-sm font-medium mb-1">Contrase馻 actual</label>
+                <Input type="password" value={formData.current_password} onChange={(e) => setFormData({ ...formData, current_password: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Nueva contrase馻</label>
+                <Input type="password" value={formData.new_password} onChange={(e) => setFormData({ ...formData, new_password: e.target.value })} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Confirmar nueva contrase馻</label>
+                <Input type="password" value={formData.confirm_password} onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === "notifications" && (
+            <div className="space-y-4 max-w-md">
+              {[
+                { key: "email_notifications", label: "Notificaciones por email" },
+                { key: "document_updates", label: "Actualizaciones de documentos" },
+                { key: "approval_requests", label: "Solicitudes de aprobaci髇" },
+                { key: "system_alerts", label: "Alertas del sistema" },
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData[key as keyof typeof formData] as boolean}
+                    onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
+                    className="h-4 w-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-slate-700">{label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t border-slate-200">
+            <Button type="submit" disabled={saving} loading={saving}><Save className="h-4 w-4 mr-2" />Guardar cambios</Button>
+          </div>
+        </form>
       </Card>
     </div>
-  )
-}
-
-function AppearanceTab() {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
-  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable')
-  const [language, setLanguage] = useState<'es' | 'ca' | 'en'>('es')
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900 mb-2">Apariencia</h3>
-        <p className="text-slate-500 text-sm">Personaliza la interfaz</p>
-      </div>
-
-      <Card variant="outlined" padding="md">
-        <h4 className="font-medium text-slate-900 mb-4">Tema</h4>
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { value: 'light', label: 'Claro', desc: 'Siempre tema claro' },
-            { value: 'dark', label: 'Oscuro', desc: 'Siempre tema oscuro' },
-            { value: 'system', label: 'Sistema', desc: 'Seguir preferencia del SO' },
-          ].map(({ value, label, desc }) => (
-            <label key={value} className="relative cursor-pointer">
-              <input
-                type="radio"
-                name="theme"
-                value={value}
-                checked={theme === value}
-                onChange={(e) => setTheme(e.target.value as any)}
-                className="sr-only"
-              />
-              <div className={clsx(
-                'p-4 rounded-lg border-2 transition-colors text-center',
-                theme === value
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              )}>
-                <p className="font-medium text-slate-900">{label}</p>
-                <p className="text-sm text-slate-500 mt-1">{desc}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-      </Card>
-
-      <Card variant="outlined" padding="md">
-        <h4 className="font-medium text-slate-900 mb-4">Densidad de la interfaz</h4>
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { value: 'comfortable', label: 'C贸moda', desc: 'Espaciado est谩ndar' },
-            { value: 'compact', label: 'Compacta', desc: 'M谩s informaci贸n en pantalla' },
-          ].map(({ value, label, desc }) => (
-            <label key={value} className="relative cursor-pointer">
-              <input
-                type="radio"
-                name="density"
-                value={value}
-                checked={density === value}
-                onChange={(e) => setDensity(e.target.value as any)}
-                className="sr-only"
-              />
-              <div className={clsx(
-                'p-4 rounded-lg border-2 transition-colors text-center',
-                density === value
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              )}>
-                <p className="font-medium text-slate-900">{label}</p>
-                <p className="text-sm text-slate-500 mt-1">{desc}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-      </Card>
-
-      <Card variant="outlined" padding="md">
-        <h4 className="font-medium text-slate-900 mb-4">Idioma</h4>
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { value: 'es', label: 'Espa帽ol', flag: '馃嚜馃嚫' },
-            { value: 'ca', label: 'Catal脿', flag: '馃彺' },
-            { value: 'en', label: 'English', flag: '馃嚞馃嚙' },
-          ].map(({ value, label, flag }) => (
-            <label key={value} className="relative cursor-pointer">
-              <input
-                type="radio"
-                name="language"
-                value={value}
-                checked={language === value}
-                onChange={(e) => setLanguage(e.target.value as any)}
-                className="sr-only"
-              />
-              <div className={clsx(
-                'p-4 rounded-lg border-2 transition-colors text-center',
-                language === value
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              )}>
-                <p className="text-2xl">{flag}</p>
-                <p className="font-medium text-slate-900 mt-2">{label}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-      </Card>
-    </div>
-  )
+  );
 }
